@@ -11,6 +11,7 @@ scale = { package = "parity-scale-codec", version = "3", default-features = fals
 scale-info = { version = "2.5", default-features = false, features = ["derive"], optional = true }
 
 openbrush = { git = "https://github.com/727-Ventures/openbrush-contracts", version = "4.0.0-beta", default-features = false }
+psp22_token = { path = "../governance-token", default-features = false, features = ["ink-as-dependency"] }
 
 [lib]
 path = "lib.rs"
@@ -22,6 +23,7 @@ std = [
     "scale/std",
     "scale-info/std",
     "openbrush/std",
+    "psp22_token/std",
 ]
 ink-as-dependency = []
 

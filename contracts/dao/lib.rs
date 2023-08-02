@@ -2,6 +2,8 @@
 
 #[ink::contract]
 pub mod dao {
+    use ink::env::call::{build_call, ExecutionInput, Selector};
+    use ink::env::DefaultEnvironment;
     use ink::storage::Mapping;
     use openbrush::contracts::traits::psp22::*;
     use scale::{
@@ -60,8 +62,8 @@ pub mod dao {
         )
     )]
     pub struct ProposalVote {
-        for_votes: u64,
-        against_vote: u64,
+        for_votes: u128,
+        against_votes: u128,
     }
 
     const ONE_MINUTE: u64 = 60;
@@ -97,7 +99,30 @@ pub mod dao {
             amount: Balance,
             duration: u64,
         ) -> Result<(), GovernorError> {
-            unimplemented!()
+            if amount <= 0 {
+                return Err(GovernorError::AmountShouldNotBeZero)
+            }
+
+            if duration <= 0 {
+                return Err(GovernorError::DurationError)
+            }
+
+            let proposal = Proposal {
+                to,
+                vote_start: self.env().block_timestamp(),
+                vote_end: self.env().block_timestamp() + duration * ONE_MINUTE,
+                executed: false,
+                amount,
+            };
+
+            self.next_proposal_id = self.next_proposal_id() + 1;
+            self.proposals.insert(self.next_proposal_id, &proposal);
+            self.proposal_votes.insert(proposal, &{ProposalVote {
+                for_votes: 0,
+                against_votes: 0
+            }});
+
+            Ok(())
         }
 
         #[ink(message)]
@@ -106,7 +131,52 @@ pub mod dao {
             proposal_id: ProposalId,
             vote: VoteType,
         ) -> Result<(), GovernorError> {
-            unimplemented!()
+            if self.proposals.contains(&proposal_id) {
+                return Err(GovernorError::ProposalNotFound)
+            };
+
+            match self.get_proposal(proposal_id.clone()) {
+                None => {}
+                Some(p) => {
+                    if p.executed == true {
+                        return Err(GovernorError::ProposalAlreadyExecuted)
+                    }
+
+                    if p.vote_end < self.env().block_timestamp() {
+                        return Err(GovernorError::VotePeriodEnded)
+                    }
+                }
+            }
+
+            let caller = self.env().caller();
+
+            if self.votes.contains(&(proposal_id, caller)) {
+                return Err(GovernorError::AlreadyVoted)
+            }
+
+            self.votes.insert(&(proposal_id, caller), &());
+
+            let caller_balance = self.balance_of_acc(caller);
+            let total_balance = self.get_total_supply();
+
+            let weight = caller_balance / total_balance * 100;
+
+            let p = self.get_proposal(proposal_id).unwrap();
+
+            let mut votes = self.proposal_votes.get(&p).expect("not found");
+
+            match vote {
+                VoteType::Against => {
+                    votes.against_votes += weight;
+                }
+                VoteType::For => {
+                    votes.for_votes += weight;
+                }
+            };
+
+            self.proposal_votes.insert(p, &votes);
+
+            Ok(())
         }
 
         #[ink(message)]
@@ -115,13 +185,40 @@ pub mod dao {
         }
 
         #[ink(message)]
-        pub fn get_proposal(&self, proposal_id: ProposalId) -> Result<Proposal, GovernorError> {
-            unimplemented!()
+        pub fn get_proposal(&self, proposal_id: ProposalId) -> Option<Proposal> {
+            if let Some(p) = self.proposals.get(proposal_id) {
+                Some(p)
+            } else {
+                None
+            }
         }
 
         #[ink(message)]
-        pub fn next_proposal_id(&self) -> Result<ProposalId, GovernorError> {
-            unimplemented!()
+        pub fn next_proposal_id(&self) -> ProposalId  {
+            self.next_proposal_id
+        }
+
+        fn balance_of_acc(&self, account_id: AccountId) -> Balance {
+            build_call::<DefaultEnvironment>()
+                .call(self.governance_token)
+                .gas_limit(0)
+                .exec_input(
+                    ExecutionInput::new(Selector::new(ink::selector_bytes!("balance_of")))
+                        .push_arg(&account_id)
+                )
+                .returns::<Balance>()
+                .invoke()
+        }
+
+        fn get_total_supply(&self) -> Balance {
+            build_call::<DefaultEnvironment>()
+                .call(self.governance_token)
+                .gas_limit(0)
+                .exec_input(
+                    ExecutionInput::new(Selector::new(ink::selector_bytes!("total_supply")))
+                )
+                .returns::<Balance>()
+                .invoke()
         }
 
         // used for test
