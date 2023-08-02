@@ -29,6 +29,7 @@ pub mod dao {
         DurationError,
         VotePeriodEnded,
         AlreadyVoted,
+        TxFailed,
     }
 
     #[derive(Encode, Decode)]
@@ -181,7 +182,44 @@ pub mod dao {
 
         #[ink(message)]
         pub fn execute(&mut self, proposal_id: ProposalId) -> Result<(), GovernorError> {
-            unimplemented!()
+            if self.proposals.contains(&proposal_id) {
+                return Err(GovernorError::ProposalNotFound);
+            };
+
+            let mut p = self.get_proposal(proposal_id).unwrap();
+
+            if p.executed == true {
+                return Err(GovernorError::ProposalAlreadyExecuted)
+            }
+
+            if let Some(votes) = self.get_proposal_votes(proposal_id) {
+                if votes.against_votes + votes.for_votes < self.quorum.into() {
+                    return Err(GovernorError::QuorumNotReached);
+                }
+
+                if votes.against_votes < votes.for_votes {
+                    return Err(GovernorError::ProposalNotAccepted);
+                }
+            }
+
+            p.executed = true;
+
+            build_call::<DefaultEnvironment>()
+                .call(self.governance_token)
+                .gas_limit(5_000_000_000)
+                .exec_input(
+                    ExecutionInput::new(Selector::new(ink::selector_bytes!(
+                        "PSP22::transfer"
+                    )))
+                        .push_arg(p.to)
+                        .push_arg(p.amount),
+                )
+                .returns::<()>()
+                .try_invoke()
+                .map_err(|_| GovernorError::TxFailed)?
+                .map_err(|_| GovernorError::TxFailed)?;
+
+            Ok(())
         }
 
         #[ink(message)]
@@ -196,6 +234,15 @@ pub mod dao {
         #[ink(message)]
         pub fn next_proposal_id(&self) -> ProposalId  {
             self.next_proposal_id
+        }
+
+        fn get_proposal_votes(&self, proposal_id: ProposalId) -> Option<ProposalVote> {
+            let p = self.get_proposal(proposal_id).unwrap();
+            if let Some(votes_distribution) = self.proposal_votes.get(&p) {
+                Some(votes_distribution)
+            } else {
+                None
+            }
         }
 
         fn balance_of_acc(&self, account_id: AccountId) -> Balance {
