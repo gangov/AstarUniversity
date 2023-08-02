@@ -12,13 +12,21 @@ pub mod dao {
     #[derive(Encode, Decode)]
     #[cfg_attr(feature = "std", derive(Debug, PartialEq, Eq, scale_info::TypeInfo))]
     pub enum VoteType {
-        // to implement
+        Against,
+        For,
     }
 
     #[derive(Copy, Clone, Debug, PartialEq, Eq, Encode, Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum GovernorError {
-        // to implement
+        ProposalNotFound,
+        ProposalAlreadyExecuted,
+        QuorumNotReached,
+        ProposalNotAccepted,
+        AmountShouldNotBeZero,
+        DurationError,
+        VotePeriodEnded,
+        AlreadyVoted,
     }
 
     #[derive(Encode, Decode)]
@@ -33,7 +41,11 @@ pub mod dao {
         )
     )]
     pub struct Proposal {
-        // to implement
+        to: AccountId,
+        vote_start: u64,
+        vote_end: u64,
+        executed: bool,
+        amount: Balance,
     }
 
     #[derive(Encode, Decode, Default)]
@@ -48,18 +60,34 @@ pub mod dao {
         )
     )]
     pub struct ProposalVote {
-        // to implement
+        for_votes: u64,
+        against_vote: u64,
     }
+
+    const ONE_MINUTE: u64 = 60;
+    pub type ProposalId = u64;
 
     #[ink(storage)]
     pub struct Governor {
-        // to implement
+        proposals: Mapping<ProposalId, Proposal>,
+        proposal_votes: Mapping<Proposal, ProposalVote>,
+        votes: Mapping<(ProposalId, AccountId), ()>,
+        next_proposal_id: ProposalId,
+        quorum: u8,
+        governance_token: AccountId,
     }
 
     impl Governor {
         #[ink(constructor, payable)]
         pub fn new(governance_token: AccountId, quorum: u8) -> Self {
-            unimplemented!()
+            Governor {
+                proposals: Default::default(),
+                proposal_votes: Default::default(),
+                votes: Default::default(),
+                next_proposal_id: Default::default(),
+                governance_token,
+                quorum,
+            }
         }
 
         #[ink(message)]
@@ -83,6 +111,16 @@ pub mod dao {
 
         #[ink(message)]
         pub fn execute(&mut self, proposal_id: ProposalId) -> Result<(), GovernorError> {
+            unimplemented!()
+        }
+
+        #[ink(message)]
+        pub fn get_proposal(&self, proposal_id: ProposalId) -> Result<Proposal, GovernorError> {
+            unimplemented!()
+        }
+
+        #[ink(message)]
+        pub fn next_proposal_id(&self) -> Result<ProposalId, GovernorError> {
             unimplemented!()
         }
 
