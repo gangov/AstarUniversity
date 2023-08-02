@@ -341,6 +341,8 @@ pub mod dao {
             assert_eq!(result, Ok(()));
             assert_eq!(governor.next_proposal_id(), 1);
             let execute = governor.execute(1);
+
+            //todo fix this it's hacky
             assert_eq!(execute, Err(GovernorError::ProposalNotFound));
         }
     }
