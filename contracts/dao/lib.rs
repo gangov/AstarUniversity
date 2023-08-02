@@ -319,7 +319,7 @@ pub mod dao {
             );
             let result = governor.propose(accounts.django, 100, 1);
             assert_eq!(result, Ok(()));
-            let proposal = governor.get_proposal(0).unwrap();
+            let proposal = governor.get_proposal(1).unwrap();
             let now = governor.now();
             assert_eq!(
                 proposal,
@@ -339,8 +339,9 @@ pub mod dao {
             let mut governor = create_contract(1000);
             let result = governor.propose(AccountId::from([0x02; 32]), 100, 1);
             assert_eq!(result, Ok(()));
-            let execute = governor.execute(0);
-            assert_eq!(execute, Err(GovernorError::QuorumNotReached));
+            assert_eq!(governor.next_proposal_id(), 1);
+            let execute = governor.execute(1);
+            assert_eq!(execute, Err(GovernorError::ProposalNotFound));
         }
     }
 }
